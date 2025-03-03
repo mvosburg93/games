@@ -107,74 +107,122 @@
     </div>
 
     <!-- Chess libraries -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.css">
 
-    <script>
-        // Game variables
-        let board = null;
-        let game = new Chess();
-        let pendingPromotion = null;
-        let aiThinking = false;
-        
-        // Initialize the game
-        function initGame() {
-            // Board configuration
-            const config = {
-                draggable: true,
-                position: 'start',
-                onDragStart: onDragStart,
-                onDrop: onDrop,
-                onSnapEnd: onSnapEnd
-            };
-            
-            // Initialize board
-            board = Chessboard('board', config);
-            
-            // Update status
-            updateStatus();
-
-            // Responsive board resize
-            $(window).resize(board.resize);
-        }
-        
-        // Check if a move is a pawn promotion
-        function isPawnPromotion(source, target) {
-            const piece = game.get(source);
-            return piece && 
-                  piece.type === 'p' && 
-                  (target.charAt(1) === '8' || target.charAt(1) === '1');
-        }
-        
-        // Handle piece drag start
-        function onDragStart(source, piece, position, orientation) {
-            // Do not allow dragging if the game is over or AI is thinking
-            if (game.game_over() || aiThinking) return false;
-            
-            // Only allow white pieces (player) to be moved
-            if (piece.search(/^b/) !== -1) return false;
-        }
-        
-        // Handle piece drop on the board
-        function onDrop(source, target) {
-            // Check if we need pawn promotion
-            if (isPawnPromotion(source, target)) {
-                pendingPromotion = { source, target };
-                $('#promotionChoice').css('display', 'flex');
-                return 'snapback';
+<script>
+    // Game variables
+    let board = null;
+    let game = new Chess();
+    let pendingPromotion = null;
+    let aiThinking = false;
+    
+    // Custom piece theme with embedded base64 images
+    const customPieceTheme = {
+        wP: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0NSIgaGVpZ2h0PSI0NSI+PHBhdGggZD0iTTIyLjUgOWMtMi4yMSAwLTQgMS43OS00IDQgMCAuODkuMjkgMS43MS43OCAyLjM4QzE3LjMzIDE2LjUgMTYgMTguNTkgMTYgMjFjMCAyLjAzLjk0IDMuODQgMi40MSA1LjAzLTMgMS4wNi03LjQxIDUuNTUtNy40MSAxMy40N2gyM2MwLTcuOTItNC40MS0xMi40MS03LjQxLTEzLjQ3IDEuNDctMS4xOSAyLjQxLTMgMi40MS01LjAzIDAtMi40MS0xLjMzLTQuNS0zLjI4LTUuNjIuNDktLjY3Ljc4LTEuNDkuNzgtMi4zOCAwLTIuMjEtMS43OS00LTQtNHoiIGZpbGw9IiNmZmYiIHN0cm9rZT0iIzAwMCIgc3Ryb2tlLXdpZHRoPSIxLjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPjwvc3ZnPg==',
+        wR: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0NSIgaGVpZ2h0PSI0NSI+PGcgZmlsbD0iI2ZmZiIgZmlsbC1ydWxlPSJldmVub2RkIiBzdHJva2U9IiMwMDAiIHN0cm9rZS13aWR0aD0iMS41IiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPjxwYXRoIGQ9Ik05IDM5aDI3di0zSDl2M3ptMy0zdi00aDIxdjRIMTJ6bS0xLTIyVjloNHYyaDVWOWg1djJoNVY5aDR2NSIgc3Ryb2tlLWxpbmVjYXA9ImJ1dHQiLz48cGF0aCBkPSJNMzQgMTRsLTMgM0gxNGwtMy0zIi8+PHBhdGggZD0iTTMxIDE3djEyLjVIMTRWMTciIHN0cm9rZS1saW5lY2FwPSJidXR0IiBzdHJva2UtbGluZWpvaW49Im1pdGVyIi8+PHBhdGggZD0iTTMxIDI5LjVsMS41IDIuNWgtMjBsMS41LTIuNSIvPjxwYXRoIGQ9Ik0xMSAxNGgyMyIgZmlsbD0ibm9uZSIgc3Ryb2tlLWxpbmVqb2luPSJtaXRlciIvPjwvZz48L3N2Zz4=',
+        wN: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0NSIgaGVpZ2h0PSI0NSI+PGcgZmlsbD0ibm9uZSIgZmlsbC1ydWxlPSJldmVub2RkIiBzdHJva2U9IiMwMDAiIHN0cm9rZS13aWR0aD0iMS41IiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPjxwYXRoIGQ9Ik0yMiAxMGMxMC41IDEgMTYuNSA4IDE2IDI5SDE1YzAtOSAxMC02LjUgOC0yMSIgZmlsbD0iI2ZmZiIvPjxwYXRoIGQ9Ik0yNCAxOGMuMzggMi45MS01LjU1IDcuMzctOCA5LTMgMi0yLjgyIDQuMzQtNSA0LTEuMDQyLS45NCAxLjQxLTMuMDQgMC0zLTEgMCAuMTkgMS4yMy0xIDItMSAwLTQuMDAzIDEtNC00IDAtMiA2LTEyIDYtMTJzMS44OS0xLjkgMi0zLjVjLS43My0uOTk0LS41LTItLjUtMyAxLTEgMyAyLjUgMyAyLjVoMnMuNzgtMS45OTIgMi41LTNjMSAwIDEgMyAxIDMiIGZpbGw9IiNmZmYiLz48cGF0aCBkPSJNOS41IDI1LjVhLjUuNSAwIDEgMS0xIDAgLjUuNSAwIDEgMSAxIDB6bTUuNDMzLTkuNzVhLjUgMS41IDMwIDEgMS0uODY2LS41LjUgMS41IDMwIDEgMSAuODY2LjV6IiBmaWxsPSIjMDAwIi8+PC9nPjwvc3ZnPg==',
+        wB: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0NSIgaGVpZ2h0PSI0NSI+PGcgZmlsbD0ibm9uZSIgZmlsbC1ydWxlPSJldmVub2RkIiBzdHJva2U9IiMwMDAiIHN0cm9rZS13aWR0aD0iMS41IiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPjxnIGZpbGw9IiNmZmYiIHN0cm9rZS1saW5lY2FwPSJidXR0Ij48cGF0aCBkPSJNOSAzNmMzLjM5LS45NyAxMC4xMS40MyAxMy41LTIgMy4zOSAyLjQzIDEwLjExIDEuMDMgMTMuNSAyIDAgMCAxLjY1LjU0IDMgMi0uNjguOTctMS42NS45OS0zIC41LTMuMzktLjk3LTEwLjExLjQ2LTEzLjUtMS0zLjM5IDEuNDYtMTAuMTEuMDMtMTMuNSAxLTEuMzU0LjQ5LTIuMzIzLjQ3LTMtLjUgMS4zNTQtMS45NCAzLTIgMy0yeiIvPjxwYXRoIGQ9Ik0xNSAzMmMyLjUgMi41IDEyLjUgMi41IDE1IDAgLjUtMS41IDAtMiAwLTIgMC0yLjUtMi41LTQtMi41LTQgNS41LTEuNSA2LTExLjUtNS0xNS41LTExIDQtMTAuNSAxNC01IDE1LjUgMCAwLTIuNSAxLjUtMi41IDQgMCAwLS41LjUgMCAyeiIvPjxwYXRoIGQ9Ik0yNSA4YTIuNSAyLjUgMCAxIDEtNSAwIDIuNSAyLjUgMCAxIDEgNSAweiIvPjwvZz48cGF0aCBkPSJNMTcuNSAyNmgxME0xNSAzMGgxNW0tNy41LTE0LjV2NU0yMCAxOGg1IiBzdHJva2UtbGluZWpvaW49Im1pdGVyIi8+PC9nPjwvc3ZnPg==',
+        wQ: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0NSIgaGVpZ2h0PSI0NSI+PGcgZmlsbD0iI2ZmZiIgZmlsbC1ydWxlPSJldmVub2RkIiBzdHJva2U9IiMwMDAiIHN0cm9rZS13aWR0aD0iMS41IiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPjxwYXRoIGQ9Ik04IDEyYTIgMiAwIDEgMS00IDAgMiAyIDAgMSAxIDQgMHptMTYuNS00LjVhMiAyIDAgMSAxLTQgMCAyIDIgMCAxIDEgNCAwek00MSAxMmEyIDIgMCAxIDEtNCAwIDIgMiAwIDEgMSA0IDB6TTE2IDhhMiAyIDAgMSAxLTQgMCAyIDIgMCAxIDEgNCAwek0zMyA4YTIgMiAwIDEgMS00IDAgMiAyIDAgMSAxIDQgMHoiLz48cGF0aCBkPSJNOSAyNmMwIDAgMS41LTUgNy01czctNSA3LTVjMCAwIC41IDUgNiA1czggNCA4IDR2Mi41bC0xMSAxTDIzIDM1cy0uNS0yLTMuNS0ybC02LjUtOWwtNyA5cy0xIDYtMSA2bC0yLTEyemM4IDE2aDQtNCIgZmlsbD0ibm9uZSIvPjxwYXRoIGQ9Ik0xMS41IDE1aC00IE0zMS40NSAxNWgtNEwzNi41IDI5LjVIMzlNMzYgMjVINE0yMy41IDExLjVWMzZNMjIuNSAyNWgtMjEiIGZpbGw9Im5vbmUiIHN0cm9rZS1saW5lY2FwPSJidXR0Ii8+PC9nPjwvc3ZnPg==',
+        wK: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0NSIgaGVpZ2h0PSI0NSI+PGcgZmlsbD0ibm9uZSIgZmlsbC1ydWxlPSJldmVub2RkIiBzdHJva2U9IiMwMDAiIHN0cm9rZS13aWR0aD0iMS41IiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPjxwYXRoIGQ9Ik0yMi41IDExLjYzVjZNMjAgOGg1IiBzdHJva2UtbGluZWpvaW49Im1pdGVyIi8+PHBhdGggZD0iTTIyLjUgMjVzNC41LTcuNSAzLTEwLjVjMCAwLTEtMi41LTMtMi41cy0zIDIuNS0zIDIuNWMtMS41IDMgMyAxMC41IDMgMTAuNSIgZmlsbD0iI2ZmZiIgc3Ryb2tlLWxpbmVjYXA9ImJ1dHQiIHN0cm9rZS1saW5lam9pbj0ibWl0ZXIiLz48cGF0aCBkPSJNMTEuNSAzN2M1LjUgMy41IDE1LjUgMy41IDIxIDB2LTdzOS00LjUgNi0xMC41Yy00LTYuNS0xMy41LTMuNS0xNiA0VjI3di0zLjVjLTMuNS03LjUtMTMtMTAuNS0xNi00LTMgNiA1IDEwIDUgMTBWMzd6IiBmaWxsPSIjZmZmIi8+PHBhdGggZD0iTTExLjUgMzBjNS41LTMgMTUuNS0zIDIxIDBtLTIxIDMuNWM1LjUtMyAxNS41LTMgMjEgMG0tMjEgMy41YzUuNS0zIDE1LjUtMyAyMSAwIi8+PC9nPjwvc3ZnPg==',
+        bP: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0NSIgaGVpZ2h0PSI0NSI+PHBhdGggZD0iTTIyLjUgOWMtMi4yMSAwLTQgMS43OS00IDQgMCAuODkuMjkgMS43MS43OCAyLjM4QzE3LjMzIDE2LjUgMTYgMTguNTkgMTYgMjFjMCAyLjAzLjk0IDMuODQgMi40MSA1LjAzLTMgMS4wNi03LjQxIDUuNTUtNy40MSAxMy40N2gyM2MwLTcuOTItNC40MS0xMi40MS03LjQxLTEzLjQ3IDEuNDctMS4xOSAyLjQxLTMgMi40MS01LjAzIDAtMi40MS0xLjMzLTQuNS0zLjI4LTUuNjIuNDktLjY3Ljc4LTEuNDkuNzgtMi4zOCAwLTIuMjEtMS43OS00LTQtNHoiIHN0cm9rZT0iIzAwMCIgc3Ryb2tlLXdpZHRoPSIxLjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPjwvc3ZnPg==',
+        bR: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0NSIgaGVpZ2h0PSI0NSI+PGcgZmlsbC1ydWxlPSJldmVub2RkIiBzdHJva2U9IiMwMDAiIHN0cm9rZS13aWR0aD0iMS41IiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPjxwYXRoIGQ9Ik05IDM5aDI3di0zSDl2M3ptMy41LTd2LTRoMjB2NEgxMi41ek05IDI0VjloNHYyaDVWOWg1djJoNVY5aDR2MTUiIHN0cm9rZS1saW5lY2FwPSJidXR0Ii8+PHBhdGggZD0iTTM0IDE0bC0zIDNIMTRsLTMtMyIvPjxwYXRoIGQ9Ik0zMSAxN3YxMi41SDE0VjE3IiBzdHJva2UtbGluZWNhcD0iYnV0dCIgc3Ryb2tlLWxpbmVqb2luPSJtaXRlciIvPjxwYXRoIGQ9Ik0zMSAyOS41bDEuNSAyLjVoLTIwbDEuNS0yLjUiLz48cGF0aCBkPSJNMTEgMTRoMjMiIGZpbGw9Im5vbmUiIHN0cm9rZS1saW5lam9pbj0ibWl0ZXIiLz48L2c+PC9zdmc+',
+        bN: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0NSIgaGVpZ2h0PSI0NSI+PGcgZmlsbD0ibm9uZSIgZmlsbC1ydWxlPSJldmVub2RkIiBzdHJva2U9IiMwMDAiIHN0cm9rZS13aWR0aD0iMS41IiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPjxwYXRoIGQ9Ik0yMiAxMGMxMC41IDEgMTYuNSA4IDE2IDI5SDE1YzAtOSAxMC02LjUgOC0yMSIgZmlsbD0iIzAwMCIvPjxwYXRoIGQ9Ik0yNCAxOGMuMzggMi45MS01LjU1IDcuMzctOCA5LTMgMi0yLjgyIDQuMzQtNSA0LTEuMDQyLS45NCAxLjQxLTMuMDQgMC0zLTEgMCAuMTkgMS4yMy0xIDItMSAwLTQuMDAzIDEtNC00IDAtMiA2LTEyIDYtMTJzMS44OS0xLjkgMi0zLjVjLS43My0uOTk0LS41LTItLjUtMyAxLTEgMyAyLjUgMyAyLjVoMnMuNzgtMS45OTIgMi41LTNjMSAwIDEgMyAxIDMiIGZpbGw9IiMwMDAiLz48cGF0aCBkPSJNOS41IDI1LjVhLjUuNSAwIDEgMS0xIDAgLjUuNSAwIDEgMSAxIDB6bTUuNDMzLTkuNzVhLjUgMS41IDMwIDEgMS0uODY2LS41LjUgMS41IDMwIDEgMSAuODY2LjV6IiBmaWxsPSIjZWNlY2VjIiBzdHJva2U9IiNlY2VjZWMiLz48cGF0aCBkPSJNMjQuNTUgMTAuNGwtLjQ1IDEuNDUuNS4xNWMzLjE1IDEgNS42NSAyLjQ5IDcuOSA2Ljc1UzM1Ljc1IDI5LjA2IDM1LjI1IDM5bC0uMDUuNWgyLjI1bC4wNS0uNWMuNS0xMC4wNi0uODgtMTYuODUtMy4yNS0yMS4zNC0yLjM3LTQuNDktNS43OS02LjY0LTkuMTktNy4xNmwtLjUxLS4xeiIgZmlsbD0iI2VjZWNlYyIgc3Ryb2tlPSJub25lIi8+PC9nPjwvc3ZnPg==',
+        bB: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0NSIgaGVpZ2h0PSI0NSI+PGcgZmlsbD0ibm9uZSIgZmlsbC1ydWxlPSJldmVub2RkIiBzdHJva2U9IiMwMDAiIHN0cm9rZS13aWR0aD0iMS41IiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPjxnIGZpbGw9IiMwMDAiIHN0cm9rZS1saW5lY2FwPSJidXR0Ij48cGF0aCBkPSJNOSAzNmMzLjM5LS45NyAxMC4xMS40MyAxMy41LTIgMy4zOSAyLjQzIDEwLjExIDEuMDMgMTMuNSAyIDAgMCAxLjY1LjU0IDMgMi0uNjguOTctMS42NS45OS0zIC41LTMuMzktLjk3LTEwLjExLjQ2LTEzLjUtMS0zLjM5IDEuNDYtMTAuMTEuMDMtMTMuNSAxLTEuMzU0LjQ5LTIuMzIzLjQ3LTMtLjUgMS4zNTQtMS45NCAzLTIgMy0yeiIvPjxwYXRoIGQ9Ik0xNSAzMmMyLjUgMi41IDEyLjUgMi41IDE1IDAgLjUtMS41IDAtMiAwLTIgMC0yLjUtMi41LTQtMi41LTQgNS41LTEuNSA2LTExLjUtNS0xNS41LTExIDQtMTAuNSAxNC01IDE1LjUgMCAwLTIuNSAxLjUtMi41IDQgMCAwLS41LjUgMCAyeiIvPjxwYXRoIGQ9Ik0yNSA4YTIuNSAyLjUgMCAxIDEtNSAwIDIuNSAyLjUgMCAxIDEgNSAweiIvPjwvZz48cGF0aCBkPSJNMTcuNSAyNmgxME0xNSAzMGgxNW0tNy41LTE0LjV2NU0yMCAxOGg1IiBzdHJva2U9IiNlY2VjZWMiIHN0cm9rZS1saW5lam9pbj0ibWl0ZXIiLz48L2c+PC9zdmc+',
+        bQ: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0NSIgaGVpZ2h0PSI0NSI+PGcgZmlsbC1ydWxlPSJldmVub2RkIiBzdHJva2U9IiMwMDAiIHN0cm9rZS13aWR0aD0iMS41IiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPjxnIHN0cm9rZT0ibm9uZSI+PGNpcmNsZSBjeD0iNiIgY3k9IjEyIiByPSIyLjc1Ii8+PGNpcmNsZSBjeD0iMTQiIGN5PSI5IiByPSIyLjc1Ii8+PGNpcmNsZSBjeD0iMjIuNSIgY3k9IjgiIHI9IjIuNzUiLz48Y2lyY2xlIGN4PSIzMSIgY3k9IjkiIHI9IjIuNzUiLz48Y2lyY2xlIGN4PSIzOSIgY3k9IjEyIiByPSIyLjc1Ii8+PC9nPjxwYXRoIGQ9Ik05IDI2YzguNS00LjUgMjEtNC41IDI3IDBsMi41LTEyLjVMMzEgMjVsLS4zLTE0LjEtNS4yIDEzLjYtMy0xNC41LTMgMTQuNS01LjItMTMuNkwxNCAyNSA2LjUgMTMuNSA5IDI2eiIgc3Ryb2tlLWxpbmVjYXA9ImJ1dHQiLz48cGF0aCBkPSJNOSAyNmMwIDIgMS41IDIgMi41IDQgMSAxLjUgMSAxIC41IDMuNS0xLjUgMS0xLjUgMi41LTEuNSAyLjUtMS41IDEuNS41IDIuNS41IDIuNSA2LjUgMSAxNi41IDEgMjMgMCAwIDAgMS41LTEgMC0yLjUgMCAwIC41LTEuNS0xLTIuNS0uNS0yLjUtLjUtMiAuNS0zLjUgMS0yIDIuNS0yIDIuNS00LTguNS00LjUtMjEtNC41LTI3IDB6IiBzdHJva2UtbGluZWNhcD0iYnV0dCIvPjxwYXRoIGQ9Ik0xMS41IDMwYzMuNS0xLjUgMTgtMS41IDIzIDBNMTIgMzNuNWMtLjUtMiAyMS41LTIgMjEgMCIgZmlsbD0ibm9uZSIvPjwvZz48L3N2Zz4=',
+        bK: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0NSIgaGVpZ2h0PSI0NSI+PGcgZmlsbD0ibm9uZSIgZmlsbC1ydWxlPSJldmVub2RkIiBzdHJva2U9IiMwMDAiIHN0cm9rZS13aWR0aD0iMS41IiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPjxwYXRoIGQ9Ik0yMi41IDExLjYzVjZNMjAgOGg1IiBzdHJva2UtbGluZWpvaW49Im1pdGVyIi8+PHBhdGggZD0iTTIyLjUgMjVzNC41LTcuNSAzLTEwLjVjMCAwLTEtMi41LTMtMi41cy0zIDIuNS0zIDIuNWMtMS41IDMgMyAxMC41IDMgMTAuNSIgZmlsbD0iIzAwMCIgc3Ryb2tlLWxpbmVjYXA9ImJ1dHQiIHN0cm9rZS1saW5lam9pbj0ibWl0ZXIiLz48cGF0aCBkPSJNMTEuNSAzN2M1LjUgMy41IDE1LjUgMy41IDIxIDB2LTdzOS00LjUgNi0xMC41Yy00LTYuNS0xMy41LTMuNS0xNiA0VjI3di0zLjVjLTMuNS03LjUtMTMtMTAuNS0xNi00LTMgNiA1IDEwIDUgMTBWMzd6IiBmaWxsPSIjMDAwIi8+PHBhdGggZD0iTTExLjUgMzBjNS41LTMgMTUuNS0zIDIxIDBtLTIxIDMuNWM1LjUtMyAxNS41LTMgMjEgMG0tMjEgMy41YzUuNS0zIDE1LjUtMyAyMSAwIiBzdHJva2U9IiNlY2VjZWMiLz48L2c+PC9zdmc+'
+    };
+    
+    // Update promotion piece images with base64 encoded versions
+    $('#promotionChoice .promotion-piece').each(function() {
+        const piece = $(this).data('piece');
+        const pieceKey = 'w' + piece.toUpperCase();
+        $(this).attr('src', customPieceTheme[pieceKey]);
+    });
+    
+    // Initialize the game
+    function initGame() {
+        // Board configuration
+        const config = {
+            draggable: true,
+            position: 'start',
+            onDragStart: onDragStart,
+            onDrop: onDrop,
+            onSnapEnd: onSnapEnd,
+            pieceTheme: function(piece) {
+                return customPieceTheme[piece];
             }
-            
-            // Try to make the move
+        };
+        
+        // Initialize board
+        board = Chessboard('board', config);
+        
+        // Update status
+        updateStatus();
+
+        // Responsive board resize
+        $(window).resize(board.resize);
+    }
+    
+    // Check if a move is a pawn promotion
+    function isPawnPromotion(source, target) {
+        const piece = game.get(source);
+        return piece && 
+              piece.type === 'p' && 
+              (target.charAt(1) === '8' || target.charAt(1) === '1');
+    }
+    
+    // Handle piece drag start
+    function onDragStart(source, piece, position, orientation) {
+        // Do not allow dragging if the game is over or AI is thinking
+        if (game.game_over() || aiThinking) return false;
+        
+        // Only allow white pieces (player) to be moved
+        if (piece.search(/^b/) !== -1) return false;
+    }
+    
+    // Handle piece drop on the board
+    function onDrop(source, target) {
+        // Check if we need pawn promotion
+        if (isPawnPromotion(source, target)) {
+            pendingPromotion = { source, target };
+            $('#promotionChoice').css('display', 'flex');
+            return 'snapback';
+        }
+        
+        // Try to make the move
+        const move = game.move({
+            from: source,
+            to: target,
+            promotion: 'q' // Default promote to queen
+        });
+        
+        // If illegal move, snap piece back
+        if (move === null) return 'snapback';
+        
+        // Update status
+        updateStatus();
+        
+        // Make AI move
+        setTimeout(makeAiMove, 250);
+    }
+    
+    // Handle selecting a promotion piece
+    $('.promotion-piece').on('click', function() {
+        const promotionPiece = $(this).data('piece');
+        
+        if (pendingPromotion) {
             const move = game.move({
-                from: source,
-                to: target,
-                promotion: 'q' // Default promote to queen
+                from: pendingPromotion.source,
+                to: pendingPromotion.target,
+                promotion: promotionPiece
             });
             
-            // If illegal move, snap piece back
-            if (move === null) return 'snapback';
+            board.position(game.fen());
+            pendingPromotion = null;
+            $('#promotionChoice').css('display', 'none');
             
             // Update status
             updateStatus();
@@ -182,141 +230,119 @@
             // Make AI move
             setTimeout(makeAiMove, 250);
         }
+    });
+    
+    // After piece snap animation completes
+    function onSnapEnd() {
+        board.position(game.fen());
+    }
+    
+    // Update game status message
+    function updateStatus() {
+        let status = '';
         
-        // Handle selecting a promotion piece
-        $('.promotion-piece').on('click', function() {
-            const promotionPiece = $(this).data('piece');
+        if (game.in_checkmate()) {
+            status = game.turn() === 'w' ? 'Game over, black wins!' : 'Game over, white wins!';
+        } else if (game.in_draw()) {
+            status = 'Game over, drawn position!';
+        } else {
+            status = game.turn() === 'w' ? 'Your turn (white)' : 'AI is thinking...';
             
-            if (pendingPromotion) {
-                const move = game.move({
-                    from: pendingPromotion.source,
-                    to: pendingPromotion.target,
-                    promotion: promotionPiece
+            if (game.in_check()) {
+                status += ', ' + (game.turn() === 'w' ? 'You are' : 'AI is') + ' in check!';
+            }
+        }
+        
+        $('#status').text(status);
+    }
+    
+    // Make the AI move (simple AI)
+    function makeAiMove() {
+        if (game.game_over() || game.turn() === 'w') return;
+        
+        aiThinking = true;
+        updateStatus();
+        
+        setTimeout(() => {
+            // AI move logic - using a weighted randomization of legal moves
+            const possibleMoves = game.moves({ verbose: true });
+            
+            if (possibleMoves.length > 0) {
+                // Weight moves: captures > checks > regular moves
+                const weightedMoves = possibleMoves.map(move => {
+                    let weight = 1;
+                    
+                    // Check if it's a capture
+                    if (move.flags.includes('c')) weight += 5;
+                    
+                    // Check if this move puts opponent in check
+                    const boardCopy = new Chess(game.fen());
+                    boardCopy.move(move);
+                    if (boardCopy.in_check()) weight += 3;
+                    
+                    // Prioritize center squares
+                    const centerSquares = ['d4', 'd5', 'e4', 'e5'];
+                    if (centerSquares.includes(move.to)) weight += 2;
+                    
+                    // Prioritize development of pieces
+                    if (game.history().length < 10 && (move.piece === 'n' || move.piece === 'b')) weight += 2;
+                    
+                    return { move, weight };
                 });
                 
+                // Sum of all weights
+                const totalWeight = weightedMoves.reduce((sum, move) => sum + move.weight, 0);
+                
+                // Choose a random move based on weights
+                let random = Math.random() * totalWeight;
+                let selectedMove = null;
+                
+                for (const weightedMove of weightedMoves) {
+                    random -= weightedMove.weight;
+                    if (random <= 0) {
+                        selectedMove = weightedMove.move;
+                        break;
+                    }
+                }
+                
+                // Fallback to random selection if weighting fails
+                if (!selectedMove) {
+                    selectedMove = possibleMoves[Math.floor(Math.random() * possibleMoves.length)];
+                }
+                
+                // Make the selected move
+                game.move(selectedMove);
                 board.position(game.fen());
-                pendingPromotion = null;
-                $('#promotionChoice').css('display', 'none');
-                
-                // Update status
-                updateStatus();
-                
-                // Make AI move
-                setTimeout(makeAiMove, 250);
             }
-        });
-        
-        // After piece snap animation completes
-        function onSnapEnd() {
+            
+            aiThinking = false;
+            updateStatus();
+        }, 500);
+    }
+    
+    // Button handlers
+    $('#newGame').on('click', function() {
+        game = new Chess();
+        board.position('start');
+        updateStatus();
+    });
+    
+    $('#undoMove').on('click', function() {
+        // Undo both player and AI moves
+        if (game.history().length >= 2) {
+            game.undo(); // Undo AI move
+            game.undo(); // Undo player move
             board.position(game.fen());
-        }
-        
-        // Update game status message
-        function updateStatus() {
-            let status = '';
-            
-            if (game.in_checkmate()) {
-                status = game.turn() === 'w' ? 'Game over, black wins!' : 'Game over, white wins!';
-            } else if (game.in_draw()) {
-                status = 'Game over, drawn position!';
-            } else {
-                status = game.turn() === 'w' ? 'Your turn (white)' : 'AI is thinking...';
-                
-                if (game.in_check()) {
-                    status += ', ' + (game.turn() === 'w' ? 'You are' : 'AI is') + ' in check!';
-                }
-            }
-            
-            $('#status').text(status);
-        }
-        
-        // Make the AI move (simple AI)
-        function makeAiMove() {
-            if (game.game_over() || game.turn() === 'w') return;
-            
-            aiThinking = true;
             updateStatus();
-            
-            setTimeout(() => {
-                // AI move logic - using a weighted randomization of legal moves
-                const possibleMoves = game.moves({ verbose: true });
-                
-                if (possibleMoves.length > 0) {
-                    // Weight moves: captures > checks > regular moves
-                    const weightedMoves = possibleMoves.map(move => {
-                        let weight = 1;
-                        
-                        // Check if it's a capture
-                        if (move.flags.includes('c')) weight += 5;
-                        
-                        // Check if this move puts opponent in check
-                        const boardCopy = new Chess(game.fen());
-                        boardCopy.move(move);
-                        if (boardCopy.in_check()) weight += 3;
-                        
-                        // Prioritize center squares
-                        const centerSquares = ['d4', 'd5', 'e4', 'e5'];
-                        if (centerSquares.includes(move.to)) weight += 2;
-                        
-                        // Prioritize development of pieces
-                        if (game.history().length < 10 && (move.piece === 'n' || move.piece === 'b')) weight += 2;
-                        
-                        return { move, weight };
-                    });
-                    
-                    // Sum of all weights
-                    const totalWeight = weightedMoves.reduce((sum, move) => sum + move.weight, 0);
-                    
-                    // Choose a random move based on weights
-                    let random = Math.random() * totalWeight;
-                    let selectedMove = null;
-                    
-                    for (const weightedMove of weightedMoves) {
-                        random -= weightedMove.weight;
-                        if (random <= 0) {
-                            selectedMove = weightedMove.move;
-                            break;
-                        }
-                    }
-                    
-                    // Fallback to random selection if weighting fails
-                    if (!selectedMove) {
-                        selectedMove = possibleMoves[Math.floor(Math.random() * possibleMoves.length)];
-                    }
-                    
-                    // Make the selected move
-                    game.move(selectedMove);
-                    board.position(game.fen());
-                }
-                
-                aiThinking = false;
-                updateStatus();
-            }, 500);
         }
-        
-        // Button handlers
-        $('#newGame').on('click', function() {
-            game = new Chess();
-            board.position('start');
-            updateStatus();
-        });
-        
-        $('#undoMove').on('click', function() {
-            // Undo both player and AI moves
-            if (game.history().length >= 2) {
-                game.undo(); // Undo AI move
-                game.undo(); // Undo player move
-                board.position(game.fen());
-                updateStatus();
-            }
-        });
-        
-        $('#flipBoard').on('click', function() {
-            board.flip();
-        });
-        
-        // Initialize game on page load
-        $(document).ready(initGame);
-    </script>
+    });
+    
+    $('#flipBoard').on('click', function() {
+        board.flip();
+    });
+    
+    // Initialize game on page load
+    $(document).ready(initGame);
+</script>
 </body>
 </html>
