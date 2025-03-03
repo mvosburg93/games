@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chess Game - Single Player vs AI</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            padding: 10px;
+            background-color: #f0f0f0;
+        }
+        .container {
+            max-width: 600px;
+            width: 100%;
+        }
+        #board {
+            width: 100%;
+            max-width: 500px;
+            margin: 0 auto;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin: 20px 0;
+        }
+        button {
+            padding: 8px 16px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        #status {
+            text-align: center;
+            margin: 10px 0;
+            font-weight: bold;
+            min-height: 20px;
+        }
+        .piece-promotion {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        .promotion-options {
+            display: flex;
+            background-color: white;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .promotion-piece {
+            width: 60px;
+            height: 60px;
+            margin: 0 5px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Chess Game</h1>
+            <p>Play against the AI - you are white</p>
+        </div>
+        
+        <div id="status">Make your move</div>
+        
+        <div id="board"></div>
+        
+        <div class="controls">
+            <button id="newGame">New Game</button>
+            <button id="undoMove">Undo Move</button>
+            <button id="flipBoard">Flip Board</button>
+        </div>
+    </div>
+
+    <div class="piece-promotion" id="promotionChoice">
+        <div class="promotion-options">
+            <img src="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/img/chesspieces/wikipedia/wQ.png" class="promotion-piece" data-piece="q">
+            <img src="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/img/chesspieces/wikipedia/wR.png" class="promotion-piece" data-piece="r">
+            <img src="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/img/chesspieces/wikipedia/wB.png" class="promotion-piece" data-piece="b">
+            <img src="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/img/chesspieces/wikipedia/wN.png" class="promotion-piece" data-piece="n">
+        </div>
+    </div>
+
+    <!-- Chess libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.css">
+
+    <script>
+        // Game variables
+        let board = null;
+        let game = new Chess();
+        let pendingPromotion = null;
+        let aiThinking = false;
+        
+        // Initialize the game
+        function initGame() {
+            // Board configuration
+            const config = {
+                draggable: true,
+                position: 'start',
+                onDragStart: onDragStart,
+                onDrop: onDrop,
+                onSnapEnd: onSnapEnd
+            };
+            
+            // Initialize board
+            board = Chessboard('board', config);
+            
+            // Update status
+            updateStatus();
+
+            // Responsive board resize
+            $(window).resize(board.resize);
+        }
+        
+        // Check if a move is a pawn promotion
+        function isPawnPromotion(source, target) {
+            const piece = game.get(source);
+            return piece && 
+                  piece.type === 'p' && 
+                  (target.charAt(1) === '8' || target.charAt(1) === '1');
+        }
+        
+        // Handle piece drag start
+        function onDragStart(source, piece, position, orientation) {
+            // Do not allow dragging if the game is over or AI is thinking
+            if (game.game_over() || aiThinking) return false;
+            
+            // Only allow white pieces (player) to be moved
+            if (piece.search(/^b/) !== -1) return false;
+        }
+        
+        // Handle piece drop on the board
+        function onDrop(source, target) {
+            // Check if we need pawn promotion
+            if (isPawnPromotion(source, target)) {
+                pendingPromotion = { source, target };
+                $('#promotionChoice').css('display', 'flex');
+                return 'snapback';
+            }
+            
+            // Try to make the move
+            const move = game.move({
+                from: source,
+                to: target,
+                promotion: 'q' // Default promote to queen
+            });
+            
+            // If illegal move, snap piece back
+            if (move === null) return 'snapback';
+            
+            // Update status
+            updateStatus();
+            
+            // Make AI move
+            setTimeout(makeAiMove, 250);
+        }
+        
+        // Handle selecting a promotion piece
+        $('.promotion-piece').on('click', function() {
+            const promotionPiece = $(this).data('piece');
+            
+            if (pendingPromotion) {
+                const move = game.move({
+                    from: pendingPromotion.source,
+                    to: pendingPromotion.target,
+                    promotion: promotionPiece
+                });
+                
+                board.position(game.fen());
+                pendingPromotion = null;
+                $('#promotionChoice').css('display', 'none');
+                
+                // Update status
+                updateStatus();
+                
+                // Make AI move
+                setTimeout(makeAiMove, 250);
+            }
+        });
+        
+        // After piece snap animation completes
+        function onSnapEnd() {
+            board.position(game.fen());
+        }
+        
+        // Update game status message
+        function updateStatus() {
+            let status = '';
+            
+            if (game.in_checkmate()) {
+                status = game.turn() === 'w' ? 'Game over, black wins!' : 'Game over, white wins!';
+            } else if (game.in_draw()) {
+                status = 'Game over, drawn position!';
+            } else {
+                status = game.turn() === 'w' ? 'Your turn (white)' : 'AI is thinking...';
+                
+                if (game.in_check()) {
+                    status += ', ' + (game.turn() === 'w' ? 'You are' : 'AI is') + ' in check!';
+                }
+            }
+            
+            $('#status').text(status);
+        }
+        
+        // Make the AI move (simple AI)
+        function makeAiMove() {
+            if (game.game_over() || game.turn() === 'w') return;
+            
+            aiThinking = true;
+            updateStatus();
+            
+            setTimeout(() => {
+                // AI move logic - using a weighted randomization of legal moves
+                const possibleMoves = game.moves({ verbose: true });
+                
+                if (possibleMoves.length > 0) {
+                    // Weight moves: captures > checks > regular moves
+                    const weightedMoves = possibleMoves.map(move => {
+                        let weight = 1;
+                        
+                        // Check if it's a capture
+                        if (move.flags.includes('c')) weight += 5;
+                        
+                        // Check if this move puts opponent in check
+                        const boardCopy = new Chess(game.fen());
+                        boardCopy.move(move);
+                        if (boardCopy.in_check()) weight += 3;
+                        
+                        // Prioritize center squares
+                        const centerSquares = ['d4', 'd5', 'e4', 'e5'];
+                        if (centerSquares.includes(move.to)) weight += 2;
+                        
+                        // Prioritize development of pieces
+                        if (game.history().length < 10 && (move.piece === 'n' || move.piece === 'b')) weight += 2;
+                        
+                        return { move, weight };
+                    });
+                    
+                    // Sum of all weights
+                    const totalWeight = weightedMoves.reduce((sum, move) => sum + move.weight, 0);
+                    
+                    // Choose a random move based on weights
+                    let random = Math.random() * totalWeight;
+                    let selectedMove = null;
+                    
+                    for (const weightedMove of weightedMoves) {
+                        random -= weightedMove.weight;
+                        if (random <= 0) {
+                            selectedMove = weightedMove.move;
+                            break;
+                        }
+                    }
+                    
+                    // Fallback to random selection if weighting fails
+                    if (!selectedMove) {
+                        selectedMove = possibleMoves[Math.floor(Math.random() * possibleMoves.length)];
+                    }
+                    
+                    // Make the selected move
+                    game.move(selectedMove);
+                    board.position(game.fen());
+                }
+                
+                aiThinking = false;
+                updateStatus();
+            }, 500);
+        }
+        
+        // Button handlers
+        $('#newGame').on('click', function() {
+            game = new Chess();
+            board.position('start');
+            updateStatus();
+        });
+        
+        $('#undoMove').on('click', function() {
+            // Undo both player and AI moves
+            if (game.history().length >= 2) {
+                game.undo(); // Undo AI move
+                game.undo(); // Undo player move
+                board.position(game.fen());
+                updateStatus();
+            }
+        });
+        
+        $('#flipBoard').on('click', function() {
+            board.flip();
+        });
+        
+        // Initialize game on page load
+        $(document).ready(initGame);
+    </script>
+</body>
+</html>
